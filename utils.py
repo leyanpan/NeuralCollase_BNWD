@@ -20,4 +20,13 @@ def combine_dicts(base_dict, enum_dict):
     return result
 
 
-
+def dict_to_file_string(d):
+  dict_str = ''
+  first = True
+  for key in sorted(d.keys()):
+    if first:
+      first = False
+    else:
+      dict_str += '_'
+    dict_str += f'{key}_{d[key]}'
+  return dict_str
