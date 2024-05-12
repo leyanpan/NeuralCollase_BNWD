@@ -78,14 +78,10 @@ def get_dataset(dataset_name, train_samples, test_samples, batch_size, random_la
       transforms.ToTensor(),
       transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
 
-    train_set = ImageNet32(root=custom_data_path['ImageNet32'], train=True, transform=transform, target_transform=target_trans)
-    test_set = ImageNet32(root=custom_data_path['ImageNet32'], train=False, transform=transform, target_transform=target_trans)
-    if train_samples:
-      train_set = torch.utils.data.Subset(train_set, range(train_samples))
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=8)
-    if test_samples:
-      test_set = torch.utils.data.Subset(test_set, range(test_samples))
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=8)
+    train_set = ImageNet32(root=custom_data_path['ImageNet32'], num_samples=train_samples, train=True, transform=transform, target_transform=target_trans)
+    test_set = ImageNet32(root=custom_data_path['ImageNet32'], num_samples=test_samples, train=False, transform=transform, target_transform=target_trans)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size)
     in_channels = 3
     num_classes = 1000
 

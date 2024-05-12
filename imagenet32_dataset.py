@@ -43,23 +43,32 @@ class ImageNet32(Dataset):
             remaining class labels so it is contiguous.
 
     """
-    def __init__(self, root, train=True, transform=None,
+    def __init__(self, root, num_samples=None, train=True, transform=None,
                  target_transform=None, exclude=None, remap_labels=False):
         self.root = os.path.expanduser(root)
         self.transform = transform
         self.target_transform = target_transform
         self.train = train  # Training set or validation set
+        self.num_samples = num_samples
 
         # Now load the picked numpy arrays
         if self.train:
             self.train_data = []
             self.train_labels = []
+            
+            cur_samples = 0
             for f in _train_list:
                 file = os.path.join(self.root, f + '.npz')
                 entry = np.load(file)
                 self.train_data.append(entry['data'])
                 self.train_labels.append(entry['labels'])
+                cur_samples += len(entry['data'])
+                if num_samples is not None:
+                    if cur_samples >= num_samples:
+                        break
             self.train_data = np.concatenate(self.train_data)
+            if num_samples is not None:
+                self.train_data = self.train_data[:num_samples]
             self.train_data = self.train_data.reshape((-1, 3, 32, 32))
             self.train_data = self.train_data.transpose((0, 2, 3, 1))  # Convert to HWC
             self.train_labels = np.concatenate(self.train_labels) - 1

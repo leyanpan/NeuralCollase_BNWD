@@ -1,12 +1,13 @@
 from torch_utils import dist_from_etf, hook_group, remove_all_hooks, matrix_rank, features
 import torch.nn as nn
 import torch
-import tqdm
+from tqdm import tqdm
 
 # custom analysis function
-def cos_analysis(model: torch.nn.Module, modules: list[torch.nn.Module], loader: torch.utils.data.DataLoader, num_classes: int, output_layer=True, criterion_summed=torch.nn.CrossEntropyLoss(reduction='sum')):
+def cos_analysis(model: torch.nn.Module, modules: list[torch.nn.Module], loader: torch.utils.data.DataLoader, num_classes: int, output_layer=True, delta=0.05, criterion_summed=torch.nn.CrossEntropyLoss(reduction='sum'), device=None):
     model.eval()
-    device = model.device
+    if device is None:
+      device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_modules = len(modules)
     num_modules_o = num_modules + 1 if output_layer else num_modules
     remove_all_hooks(model)
@@ -21,6 +22,8 @@ def cos_analysis(model: torch.nn.Module, modules: list[torch.nn.Module], loader:
     inter_cos = []
     avg_intra = []
     avg_inter = []
+    delta_intra = []
+    delta_inter = []
     qmean_norms = []
     # Weight Matrix Rank
     ranks = []
@@ -140,18 +143,21 @@ def cos_analysis(model: torch.nn.Module, modules: list[torch.nn.Module], loader:
             normed_vecs[i][c] /= cnts[c]
         full_cos = torch.stack(normed_vecs[i]) @ torch.stack(normed_vecs[i]).T
         intra_cos_vals = torch.diag(full_cos)
+        inter_cos_vals = full_cos[torch.eye(full_cos.shape[0], dtype=int) == 0]
         cnts[cnts < 2] = 2
         intra_cos_vals *= (cnts / (cnts - 1))
         intra_cos_vals -= (1 / (cnts - 1))
         intra_cos.append(intra_cos_vals.min().item())
-        inter_cos.append(full_cos[torch.eye(full_cos.shape[0], dtype=int) == 0].max().item())
+        inter_cos.append(inter_cos_vals.max().item())
         avg_intra.append(intra_cos_vals.mean().item())
-        avg_inter.append(full_cos[torch.eye(full_cos.shape[0], dtype=int) == 0].mean().item())
+        avg_inter.append(inter_cos_vals.mean().item())
+        delta_intra.append(intra_cos_vals.quantile(delta).item())
+        delta_inter.append(inter_cos_vals.quantile(1 - delta).item())
 
 
-    return loss, intra_cos, inter_cos, avg_intra, avg_inter, qmean_norms, bn_norms, weight_norms, nccs, ranks
+    return loss, intra_cos, inter_cos, avg_intra, avg_inter, delta_intra, delta_inter, qmean_norms, bn_norms, weight_norms, nccs, ranks
 
-def cos_analysis_str(loss, intra_cos, inter_cos, avg_intra, avg_inter, qmean_norms, bn_norms, weight_norms, nccs, ranks, hooked_modules):
+def cos_analysis_str(loss, intra_cos, inter_cos, avg_intra, avg_inter, delta_intra, delta_inter, qmean_norms, bn_norms, weight_norms, nccs, ranks, hooked_modules, delta):
   output_str = ""
   bn_id = 0
   linear_id = 0
@@ -173,6 +179,8 @@ def cos_analysis_str(loss, intra_cos, inter_cos, avg_intra, avg_inter, qmean_nor
     output_str += f"Inter Cos: {inter_cos[i]}\n"
     output_str += f"Intra Avg: {avg_intra[i]}\n"
     output_str += f"Inter Avg: {avg_inter[i]}\n"
+    output_str += f"Intra Delta (delta={delta}): {delta_intra[i]}\n"
+    output_str += f"Inter Delta (delta={delta}): {delta_inter[i]}\n"
     output_str += f"Norm Quadratic Average: {qmean_norms[i]}\n"
     output_str += f"Nearest Class Center Accuracy: {nccs[i]}\n"
     output_str += "\n"

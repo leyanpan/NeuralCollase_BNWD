@@ -16,7 +16,7 @@ from imagenet32_dataset import ImageNet32
 
 from utils import combine_dicts, dict_to_file_string
 from torch_utils import hook, hook_group, features
-from train import run_expt
+from train import train
 from dataloader import get_dataset
 from models import get_model
 from train import train
@@ -31,7 +31,7 @@ def setup_parser():
 
     # Path options
     parser.add_argument('--model_save_path', type=str, default='models', help='Path to save the model.')
-    parser.add_argument('--data_save_path', type=str, default='data', help='Path to save the data.')
+    parser.add_argument('--data_save_path', type=str, default='results', help='Path to save the data.')
     parser.add_argument('--figure_save_path', type=str, default='figures', help='Path to save figures.')
 
     # Model hyperparameters
@@ -74,15 +74,24 @@ def setup_parser():
     # Data augmentation
     parser.add_argument('--random_labels', action='store_true', help='Use random labels for the dataset.')
 
+    # Evaluation
+    parser.add_argument('--early_layers', action='store_true', help='Evaluate Consine Similarity of Earlier layers instead of only last layer.')
+    parser.add_argument('--delta', type=float, default=0.05, help='Delta value for theoretical results comparison.')
+
     # Others
     parser.add_argument('--save_model', action='store_true', help='Whether to save the trained models.')
+    parser.add_argument('--debug', action='store_true', help='Debug mode.')
 
     return parser
 
 
 def run_expt(args, options_dict):
+    if args.debug:
+        args.epochs = 5
+        args.train_samples = 10000
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_loader, test_loader, num_classes, in_channels = get_dataset(args.dataset, args.train_samples, args.test_samples, args.random_labels)
+    train_loader, test_loader, num_classes, in_channels = get_dataset(args.dataset, args.train_samples, args.test_samples, args.batch_size, args.random_labels)
 
     # Save files to param dictionary
     dict_str = dict_to_file_string(options_dict)
@@ -90,7 +99,7 @@ def run_expt(args, options_dict):
     data_fn = os.path.join(args.data_save_path, f"{dict_str}.txt")
     figure_fn = os.path.join(args.figure_save_path, f"{dict_str}.png")
 
-    model, classifier, hooked_modules = get_model(args.model_type, num_classes, in_channels)
+    model, classifier, hooked_modules = get_model(args.model_type, num_classes, in_channels, device, args)
     model.register_forward_hook(hook)
 
     optimizer = optim.Adam(model.parameters(),
@@ -114,14 +123,16 @@ def run_expt(args, options_dict):
         train(model, criterion, device, num_classes, train_loader, optimizer, epoch)
         lr_scheduler.step()
 
-    loss, intra_cos, inter_cos, avg_intra, avg_inter, qmean_norms, bn_norms, weight_norms, nccs, ranks = cos_analysis(model, hooked_modules, train_loader, num_classes, criterion_summed=criterion_summed)
-    analysis_str = cos_analysis_str(loss, intra_cos, inter_cos, avg_intra, avg_inter, qmean_norms, bn_norms, weight_norms, nccs, ranks, hooked_modules)
+    loss, intra_cos, inter_cos, avg_intra, avg_inter, delta_intra, delta_inter, qmean_norms, bn_norms, weight_norms, nccs, ranks = cos_analysis(model, hooked_modules, train_loader, num_classes, criterion_summed=criterion_summed, delta=args.delta)
+    analysis_str = cos_analysis_str(loss, intra_cos, inter_cos, avg_intra, avg_inter, delta_intra, delta_inter, qmean_norms, bn_norms, weight_norms, nccs, ranks, hooked_modules, args.delta)
+    if args.debug:
+        print(analysis_str)
+    else:
+        with open(data_fn, 'w') as f:
+            f.write(analysis_str)
 
-    with open(data_fn, 'w') as f:
-        f.write(analysis_str)
-
-    if args.save_model:
-        torch.save(model, model_fn)
+        if args.save_model:
+            torch.save(model, model_fn)
 
 
 def main(args):
@@ -135,6 +146,7 @@ def main(args):
     for options_dict in combine_dicts(options[0], options[1]):
         args_copy = vars(args).copy()
         args_copy.update(options_dict)
+        args_copy = argparse.Namespace(**args_copy)
         run_expt(args_copy, options_dict)
 
 if __name__ == '__main__':

@@ -72,22 +72,31 @@ def get_model(model_type, num_classes, in_channels, device, args):
       model = resnet
     # register hook that saves last-layer input into features
     classifier = resnet.fc
-    hooked_modules = [resnet.conv1, resnet.layer1, resnet.layer2, resnet.layer3, resnet.layer4, resnet.fc]
+    if args.early_layers:
+        hooked_modules = [resnet.conv1, resnet.layer1, resnet.layer2, resnet.layer3, resnet.layer4, resnet.fc]
+    else:
+        hooked_modules = [resnet.fc]
 
   elif model_type == 'MLP':
     depths = layer_width = [args.input_dim] + [args.hidden_layer_width] * (args.model_depth_MLP - 1) + [num_classes]
     C = num_classes
     model = MLP(layer_width, bn=args.bn, weight_norm=args.weight_norm)
     classifier = model.last_layer
-    for m in model.feature:
-      if isinstance(m, nn.Linear):
-        hooked_modules += [m]
-    hooked_modules += [model.last_layer]
+    if args.early_layers:
+        for m in model.feature:
+            if isinstance(m, nn.Linear):
+                hooked_modules += [m]
+            hooked_modules += [model.last_layer]
+    else:
+        hooked_modules = [model.last_layer]
 
   elif model_type.startswith('vgg'):
     model, modules = load_vgg_model(model_type, args.bn, num_classes, in_channels)
     classifier = model.classifier[-1]
-    hooked_modules = modules
+    if args.early_layers:
+        hooked_modules = modules
+    else:
+        hooked_modules = [classifier]
 
   model = model.to(device)
 

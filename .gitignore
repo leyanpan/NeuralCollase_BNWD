@@ -11,3 +11,6 @@ input.txt
 train.npy
 val.npy
 meta.pkl
+
+data/
+results/
