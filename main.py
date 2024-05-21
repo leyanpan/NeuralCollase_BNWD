@@ -81,6 +81,7 @@ def setup_parser():
     # Others
     parser.add_argument('--save_model', action='store_true', help='Whether to save the trained models.')
     parser.add_argument('--debug', action='store_true', help='Debug mode.')
+    parser.add_argument('--cuda_device', type=int, default=0, help='CUDA device to use.')
 
     return parser
 
@@ -90,7 +91,7 @@ def run_expt(args, options_dict):
         args.epochs = 5
         args.train_samples = 10000
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:{args.cuda_device}" if torch.cuda.is_available() else "cpu")
     train_loader, test_loader, num_classes, in_channels = get_dataset(args.dataset, args.train_samples, args.test_samples, args.batch_size, args.random_labels)
 
     # Save files to param dictionary
@@ -123,7 +124,7 @@ def run_expt(args, options_dict):
         train(model, criterion, device, num_classes, train_loader, optimizer, epoch)
         lr_scheduler.step()
 
-    loss, intra_cos, inter_cos, avg_intra, avg_inter, delta_intra, delta_inter, qmean_norms, bn_norms, weight_norms, nccs, ranks = cos_analysis(model, hooked_modules, train_loader, num_classes, criterion_summed=criterion_summed, delta=args.delta)
+    loss, intra_cos, inter_cos, avg_intra, avg_inter, delta_intra, delta_inter, qmean_norms, bn_norms, weight_norms, nccs, ranks = cos_analysis(model, hooked_modules, train_loader, num_classes, criterion_summed=criterion_summed, delta=args.delta, device=device)
     analysis_str = cos_analysis_str(loss, intra_cos, inter_cos, avg_intra, avg_inter, delta_intra, delta_inter, qmean_norms, bn_norms, weight_norms, nccs, ranks, hooked_modules, args.delta)
     if args.debug:
         print(analysis_str)
