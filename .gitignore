@@ -12,5 +12,4 @@ train.npy
 val.npy
 meta.pkl
 
-data/
-results/
+data/ImageNet32

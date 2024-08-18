@@ -1,0 +1,23 @@
+Loss: 0.008046087808907032
+Layer 0: Linear(in_features=4096, out_features=1000, bias=True)
+Linear Weight Norm: 11.254918098449707
+Linear Weight Rank: 972
+Intra Cos: 0.34543904662132263
+Inter Cos: 0.7739313840866089
+Intra Avg: 0.9189629554748535
+Inter Avg: -0.0008136705146171153
+Intra Delta (delta=0.05): 0.8100943565368652
+Inter Delta (delta=0.05): 0.4020451605319977
+Norm Quadratic Average: 128.19798278808594
+Nearest Class Center Accuracy: 0.0
+
+Output Layer:
+Intra Cos: 0.43637657165527344
+Inter Cos: 0.7787385582923889
+Intra Avg: 0.9036635160446167
+Inter Avg: -0.0006938495207577944
+Intra Delta (delta=0.05): 0.7908708453178406
+Inter Delta (delta=0.05): 0.328881174325943
+Norm Quadratic Average: 94.83056640625
+Nearest Class Center Accuracy: 0.0
+
